@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body, html {
+  background: transparent !important; /* atau hapus baris background-color: #000; */
+}
+
+/* filepath: c:\ProjectJB\tokoroti\src\app\globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Professional Animation Keyframes */
+@keyframes gentleFloat {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-15px) rotate(1deg);
+    opacity: 0.8;
+  }
+}
+
+@keyframes gentleFloatDelayed {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-20px) rotate(-1deg);
+    opacity: 0.7;
+  }
+}
+
+@keyframes professionalFloat {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-8px) scale(1.05);
+    opacity: 0.6;
+  }
+}
+
+@keyframes gentlePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.6;
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes horizontalDrift {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Professional Animation Classes */
+.animate-gentle-float {
+  animation: gentleFloat 8s ease-in-out infinite;
+}
+
+.animate-gentle-float-delayed {
+  animation: gentleFloatDelayed 10s ease-in-out infinite;
+}
+
+.animate-professional-float {
+  animation: professionalFloat 12s ease-in-out infinite;
+}
+
+.animate-gentle-pulse {
+  animation: gentlePulse 6s ease-in-out infinite;
+}
+
+.animate-twinkle {
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+.animate-horizontal-drift {
+  animation: horizontalDrift 20s linear infinite;
+}
+
+/* Existing animations for backward compatibility */
+.animate-fadeIn {
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
