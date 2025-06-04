@@ -510,13 +510,16 @@ function AboutSection() {
 
 function CallToActionSection() {
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-r from-amber-600/90 via-orange-600/90 to-red-600/90 backdrop-blur-sm relative overflow-hidden z-10">
+    <section
+      id="contact-section"
+      className="py-16 sm:py-20 bg-gradient-to-r from-amber-600/90 via-orange-600/90 to-red-600/90 backdrop-blur-sm relative overflow-hidden z-10"
+    >
       <div className="absolute inset-0">
         <div className="absolute top-6 sm:top-10 left-6 sm:left-10 w-20 sm:w-32 h-20 sm:h-32 bg-white/10 rounded-full animate-spin"></div>
         <div className="absolute bottom-6 sm:bottom-10 right-6 sm:right-10 w-32 sm:w-48 h-32 sm:h-48 bg-white/5 rounded-full animate-pulse"></div>
       </div>
-
-      <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
+      
+      <div className="relative z-20 container mx-auto px-4 sm:px-6 text-center">
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-4 sm:mb-6">
           Siap Merasakan Kelezatan Sempurna?
         </h2>
@@ -532,6 +535,7 @@ function CallToActionSection() {
         </div>
 
         <div className="flex flex-col gap-3 sm:gap-4 justify-center items-center max-w-md mx-auto">
+          {/* WhatsApp Link */}
           <a
             href="https://wa.me/6282152673902"
             target="_blank"
@@ -559,6 +563,7 @@ function CallToActionSection() {
             </div>
           </a>
 
+          {/* Instagram Link */}
           <a
             href="https://instagram.com/alyacakeandbakery"
             target="_blank"
@@ -586,6 +591,7 @@ function CallToActionSection() {
             </div>
           </a>
 
+          {/* Facebook Link */}
           <a
             href="https://facebook.com/alyacakeandbakery"
             target="_blank"
