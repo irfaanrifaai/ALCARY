@@ -739,29 +739,32 @@ export default function RootLayout({ children }) {
 
   const handleLogout = async () => {
     try {
+      setLoading(true);
+      
       // Clear localStorage terlebih dahulu
       localStorage.removeItem('alcary-cart');
-      localStorage.removeItem('supabase.auth.token');
       
-      // Logout dari Supabase
-      const { error } = await supabase.auth.signOut({
-        scope: 'local' // Gunakan 'local' bukan 'global'
-      });
+      // Logout dari Supabase dengan method sederhana
+      const { error } = await supabase.auth.signOut();
 
       if (error) {
         console.error('Logout error:', error);
-        // Paksa clear session meskipun ada error
-        await supabase.auth.admin.deleteUser();
       }
 
-      // Force redirect ke home
-      window.location.href = '/';
+      // Clear user state
+      setUser(null);
+      
+      // Redirect ke home
+      router.push('/');
       
     } catch (error) {
       console.error('Logout failed:', error);
       // Paksa clear dan redirect jika gagal
       localStorage.clear();
-      window.location.href = '/';
+      setUser(null);
+      router.push('/');
+    } finally {
+      setLoading(false);
     }
   };
 
