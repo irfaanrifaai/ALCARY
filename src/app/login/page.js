@@ -1,203 +1,254 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
 
-// Komponen terpisah untuk SearchParams
-function LoginForm() {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+// FUNCTION SEDERHANA CEK ADMIN
+const isAdminEmail = (email) => {
+  const adminEmails = [
+    "alcary@gmail.com", // Admin utama
+    "admin@alcary.com", // Backup admin
+  ];
+  return adminEmails.includes(email?.toLowerCase());
+};
+
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLogin, setIsLogin] = useState(true);
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [fullName, setFullName] = useState("");
-
-  const redirectTo = searchParams.get("redirect") || "/";
+  const [isLogin, setIsLogin] = useState(true);
 
   useEffect(() => {
-    // Cek jika sudah login
-    const checkUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        router.push(redirectTo);
+    document.body.classList.add("login-no-scroll");
+    return () => {
+      document.body.classList.remove("login-no-scroll");
+    };
+  }, []);
+
+  // SIMPLE useEffect - TANPA AUTH LISTENER
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session) {
+          console.log("✅ User already logged in:", session.user.email);
+          if (isAdminEmail(session.user.email)) {
+            router.replace("/products");
+          } else {
+            router.replace("/");
+          }
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
       }
     };
-    checkUser();
-  }, [router, redirectTo]);
 
-  const handleSubmit = async (e) => {
+    checkExistingSession();
+
+    const errorParam = searchParams.get("error");
+    if (errorParam === "auth-failed") {
+      setError("Login gagal. Silakan coba lagi.");
+    }
+  }, []); // DEPENDENCY ARRAY KOSONG
+
+  // Handle Login - DENGAN REDIRECT LANGSUNG
+  const handleEmailLogin = async (e) => {
     e.preventDefault();
+
+    if (loading) return; // PREVENT MULTIPLE CLICKS
+
     setLoading(true);
-    setMessage("");
+    setError("");
+
+    console.log("🔄 Starting login for:", email.trim());
 
     try {
-      if (isLogin) {
-        // Login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          setMessage(error.message);
-        } else {
-          setMessage("Login berhasil! Mengalihkan...");
-          setTimeout(() => {
-            router.push(redirectTo);
-          }, 1000);
+      const { data, error: authError } = await supabase.auth.signInWithPassword(
+        {
+          email: email.trim(),
+          password: password,
         }
-      } else {
-        // Register
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
+      );
 
-        if (error) {
-          setMessage(error.message);
+      if (authError) {
+        console.error("❌ Login error:", authError.message);
+        setError("Email atau password salah. Silakan coba lagi.");
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        console.log("✅ Login successful for:", data.user.email);
+
+        // LANGSUNG REDIRECT TANPA DELAY
+        if (isAdminEmail(data.user.email)) {
+          console.log("🔑 Admin user, redirecting to products");
+          window.location.href = "/products";
         } else {
-          setMessage(
-            "Registrasi berhasil! Silakan cek email untuk verifikasi."
-          );
-          setIsLogin(true);
+          console.log("👤 Regular user, redirecting to home");
+          window.location.href = "/";
         }
       }
-    } catch (error) {
-      setMessage("Terjadi kesalahan: " + error.message);
-    } finally {
+    } catch (err) {
+      console.error("🚨 Unexpected error:", err);
+      setError("Terjadi kesalahan. Silakan coba lagi.");
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  // Handle Registration
+  const handleEmailRegister = async (e) => {
+    e.preventDefault();
+
+    if (loading) return;
+
     setLoading(true);
+    setError("");
+    setMessage("");
+
+    if (password !== confirmPassword) {
+      setError("Password tidak sama. Silakan periksa kembali.");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password minimal 6 karakter.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(
-            redirectTo
-          )}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
       if (error) {
-        setMessage("Error Google login: " + error.message);
-        setLoading(false);
+        if (error.message.includes("already registered")) {
+          setError("Email sudah terdaftar. Silakan gunakan login.");
+        } else {
+          setError("Gagal mendaftar: " + error.message);
+        }
+      } else {
+        setMessage("Pendaftaran berhasil! Email konfirmasi telah dikirim.");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
       }
-    } catch (error) {
-      setMessage("Error: " + error.message);
-      setLoading(false);
+    } catch (err) {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    }
+
+    setLoading(false);
+  };
+
+  // Google Login
+  const handleGoogleLogin = async () => {
+    if (loading) return;
+
+    setError("");
+    console.log("🔄 Starting Google OAuth...");
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      console.error("Google OAuth error:", error);
+      setError("Gagal login dengan Google. Coba lagi.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 border border-orange-200">
-        <div className="text-center mb-8">
-          <Link href="/">
-            <h1 className="text-4xl font-black bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 bg-clip-text text-transparent tracking-tight cursor-pointer hover:scale-105 transition-transform duration-300">
+    <>
+      <style>{`
+    body {
+      overflow: hidden;
+      touch-action: none;
+    }
+  `}</style>
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-2 sm:p-4 overflow-hidden">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-4 sm:p-8 border border-amber-100 max-h-screen overflow-auto -mt-14 sm:mt-0">
+          {/* Header - RESPONSIVE TEXT SIZE */}
+          <div className="text-center mb-4 sm:mb-8">
+            <h1 className="text-2xl sm:text-4xl font-black bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mb-2 sm:mb-3 tracking-wide">
               ALCARY
             </h1>
-          </Link>
-          <p className="text-gray-600 mt-2">
-            {isLogin ? "Masuk ke akun Anda" : "Buat akun baru"}
-          </p>
-        </div>
-
-        {message && (
-          <div
-            className={`p-4 rounded-lg mb-6 text-sm ${
-              message.includes("berhasil") || message.includes("Silakan cek")
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
-            {message}
+            <p className="text-gray-600 text-sm sm:text-lg">
+              {isLogin ? "Masuk ke akun Anda" : "Daftar akun baru"}
+            </p>
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {!isLogin && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nama Lengkap
-              </label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                placeholder="Masukkan nama lengkap"
-                required={!isLogin}
-              />
+          {/* Error Messages - SMALLER SPACING */}
+          {error && (
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs sm:text-sm">
+              <div className="flex items-center">
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span className="leading-tight">{error}</span>
+              </div>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-              placeholder="Masukkan email"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-              placeholder="Masukkan password"
-              required
-              minLength={6}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-orange-500 to-amber-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Memproses..." : isLogin ? "Masuk" : "Daftar"}
-          </button>
-        </form>
-
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+          {/* Success Messages - SMALLER SPACING */}
+          {message && (
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg text-xs sm:text-sm">
+              <div className="flex items-center">
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span className="leading-tight">{message}</span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">atau</span>
-            </div>
-          </div>
+          )}
 
+          {/* Google Login Button - SMALLER ON MOBILE */}
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full mt-4 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50 transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50"
+            className="w-full mb-4 sm:mb-6 flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0"
+              viewBox="0 0 24 24"
+            >
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -215,54 +266,129 @@ function LoginForm() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Masuk dengan Google
+            <span className="font-medium text-gray-700 group-hover:text-gray-900 text-sm sm:text-base">
+              {isLogin ? "Masuk dengan Google" : "Daftar dengan Google"}
+            </span>
           </button>
-        </div>
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setMessage("");
-              setEmail("");
-              setPassword("");
-              setFullName("");
-            }}
-            className="text-orange-600 hover:text-orange-700 font-medium transition-colors"
-          >
-            {isLogin
-              ? "Belum punya akun? Daftar di sini"
-              : "Sudah punya akun? Masuk di sini"}
-          </button>
-        </div>
+          {/* Divider - SMALLER SPACING */}
+          <div className="relative mb-4 sm:mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-xs sm:text-sm">
+              <span className="px-2 bg-white text-gray-500">atau</span>
+            </div>
+          </div>
 
-        <div className="mt-4 text-center">
-          <Link
-            href="/"
-            className="text-gray-500 hover:text-gray-700 text-sm transition-colors"
+          {/* Email/Password Form - COMPACT SPACING */}
+          <form
+            onSubmit={isLogin ? handleEmailLogin : handleEmailRegister}
+            className="space-y-4 sm:space-y-6"
           >
-            ← Kembali ke Beranda
-          </Link>
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                placeholder="nama@email.com"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                placeholder="••••••••"
+                required
+                minLength={6}
+                disabled={loading}
+              />
+            </div>
+
+            {!isLogin && (
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  Konfirmasi Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg font-semibold hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg text-sm sm:text-base"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-2"></div>
+                  <span className="text-sm sm:text-base">
+                    {isLogin ? "Masuk..." : "Mendaftar..."}
+                  </span>
+                </div>
+              ) : isLogin ? (
+                "Masuk"
+              ) : (
+                "Daftar Akun"
+              )}
+            </button>
+          </form>
+
+          {/* Toggle Login/Register - SMALLER TEXT */}
+          <div className="mt-4 sm:mt-6 text-center">
+            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
+              {isLogin ? "Belum punya akun?" : "Sudah punya akun?"}{" "}
+              <button
+                onClick={() => {
+                  if (loading) return;
+                  setIsLogin(!isLogin);
+                  setError("");
+                  setMessage("");
+                  setEmail("");
+                  setPassword("");
+                  setConfirmPassword("");
+                }}
+                className="text-amber-600 hover:text-amber-700 font-medium hover:underline disabled:opacity-50"
+                disabled={loading}
+              >
+                {isLogin ? "Daftar di sini" : "Masuk di sini"}
+              </button>
+            </p>
+          </div>
+
+          {/* Back to Home - SMALLER TEXT */}
+          <div className="mt-3 sm:mt-4 text-center">
+            <button
+              onClick={() => !loading && router.push("/")}
+              className="text-amber-600 hover:text-amber-700 text-xs sm:text-sm font-medium hover:underline disabled:opacity-50"
+              disabled={loading}
+            >
+              Kembali ke Beranda
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// Loading fallback component
-function LoginLoading() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-    </div>
-  );
-}
-
-// Main page component dengan Suspense
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<LoginLoading />}>
-      <LoginForm />
-    </Suspense>
+    </>
   );
 }
