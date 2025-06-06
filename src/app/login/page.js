@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
@@ -17,7 +17,8 @@ const isAdminEmail = (email) => {
   return adminEmails.includes(email?.toLowerCase());
 };
 
-export default function LoginPage() {
+// Komponen yang menggunakan useSearchParams
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -182,11 +183,11 @@ export default function LoginPage() {
   return (
     <>
       <style>{`
-    body {
-      overflow: hidden;
-      touch-action: none;
-    }
-  `}</style>
+        body {
+          overflow: hidden;
+          touch-action: none;
+        }
+      `}</style>
       <div className="h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-2 sm:p-4 overflow-hidden">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-4 sm:p-8 border border-amber-100 max-h-screen overflow-auto -mt-14 sm:mt-0">
           {/* Header - RESPONSIVE TEXT SIZE */}
@@ -390,5 +391,18 @@ export default function LoginPage() {
         </div>
       </div>
     </>
+  );
+}
+
+// Main export dengan Suspense
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
